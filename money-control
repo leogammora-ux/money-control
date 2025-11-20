@@ -1,0 +1,205 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { motion } from "framer-motion";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import * as XLSX from "xlsx";
+
+export default function MoneyManager() {
+  const [entries, setEntries] = useState([]);
+  const [type, setType] = useState("entrada");
+  const [amount, setAmount] = useState(0);
+  const [desc, setDesc] = useState("");
+  const [category, setCategory] = useState("general");
+  const [filter, setFilter] = useState("all");
+  const [calcA, setCalcA] = useState(0);
+  const [calcB, setCalcB] = useState(0);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("moneyEntries");
+    if (saved) setEntries(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("moneyEntries", JSON.stringify(entries));
+  }, [entries]);
+
+  const addEntry = () => {
+    if (!amount || !desc) return;
+    const newEntry = {
+      id: Date.now(),
+      type,
+      amount: Number(amount),
+      desc,
+      category,
+      date: new Date().toLocaleString(),
+    };
+    setEntries([...entries, newEntry]);
+    setAmount(0);
+    setDesc("");
+  };
+
+  const filteredEntries = entries.filter((e) => (filter === "all" ? true : e.type === filter));
+
+  const total = entries.reduce((acc, e) => acc + (e.type === "entrada" ? e.amount : -e.amount), 0);
+
+  const graphData = entries.map((e) => ({
+    date: e.date,
+    inversion: e.type === "salida" ? e.amount : 0,
+    venta: e.type === "entrada" ? e.amount : 0,
+    ganancia: total,
+  }));
+
+  const exportExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(entries);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Movimientos");
+    XLSX.writeFile(workbook, "movimientos.xlsx");
+  };
+
+  return (
+    <div className="p-6 grid gap-6">
+      <h1 className="text-2xl font-bold">Sistema de Gestión de Dinero Mejorado</h1>
+
+      <Card className="p-4 shadow-xl rounded-2xl">
+        <CardContent>
+          <h2 className="text-xl font-semibold mb-3">Agregar Movimiento</h2>
+          <div className="grid gap-3">
+            <select value={type} onChange={(e) => setType(e.target.value)} className="border rounded p-2">
+              <option value="entrada">Entrada</option>
+              <option value="salida">Salida</option>
+            </select>
+
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="border rounded p-2">
+              <option value="general">General</option>
+              <option value="comida">Comida</option>
+              <option value="transporte">Transporte</option>
+              <option value="inversion">Inversión</option>
+              <option value="otros">Otros</option>
+            </select>
+
+            <Input type="number" placeholder="Cantidad" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <Input placeholder="Descripción" value={desc} onChange={(e) => setDesc(e.target.value)} />
+            <Button onClick={addEntry}>Agregar</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="p-4 shadow-xl rounded-2xl">
+        <CardContent>
+          <h2 className="text-xl font-semibold mb-3">Filtro de movimientos</h2>
+          <select value={filter} onChange={(e) => setFilter(e.target.value)} className="border rounded p-2">
+            <option value="all">Todos</option>
+            <option value="entrada">Entradas</option>
+            <option value="salida">Salidas</option>
+          </select>
+        </CardContent>
+      </Card>
+
+      <Card className="p-4 shadow-xl rounded-2xl">
+        <CardContent>
+          <h2 className="text-xl font-semibold mb-3">Tabla de Movimientos</h2>
+          <Button className="mb-3" onClick={exportExcel}>Exportar a Excel</Button>
+          <table className="w-full text-left border">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Categoría</th>
+                <th>Cantidad</th>
+                <th>Descripción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEntries.map((e) => (
+                <tr key={e.id} className="border-t">
+                  <td>{e.date}</td>
+                  <td>{e.type}</td>
+                  <td>{e.category}</td>
+                  <td>{e.amount}</td>
+                  <td>{e.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-3 font-bold">Total: {total}</p>
+        </CardContent>
+      </Card>
+
+      <Card className="p-4 shadow-xl rounded-2xl">
+        <CardContent>
+          <h2 className="text-xl font-semibold mb-2">Calculadora</h2>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <Input type="number" value={calcA} onChange={(e) => setCalcA(e.target.value)} />
+            <Input type="number" value={calcB} onChange={(e) => setCalcB(e.target.value)} />
+          </div>
+          <p>Suma: {Number(calcA) + Number(calcB)}</p>
+        </CardContent>
+      </Card>
+
+      <Card className="p-4 shadow-xl rounded-2xl">
+        <CardContent>
+          <h2 className="text-xl font-semibold mb-4">Gráfica de Inversión, Ventas y Ganancias</h2>
+          <LineChart width={600} height={300} data={graphData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="inversion" />
+            <Line type="monotone" dataKey="venta" />
+            <Line type="monotone" dataKey="ganancia" />
+          </LineChart>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ======= PWA: manifest.json =======
+export const manifest = {
+  name: "Money Control",
+  short_name: "MoneyControl",
+  description: "App de gestión de dinero con soporte PWA",
+  display: "standalone",
+  background_color: "#000000",
+  theme_color: "#000000",
+  icons: [
+    {
+      src: "/icons/peso-192.png",
+      sizes: "192x192",
+      type: "image/png",
+    },
+    {
+      src: "/icons/peso-512.png",
+      sizes: "512x512",
+      type: "image/png",
+    }
+  ]
+};
+
+// ======= PWA: service-worker.js =======
+export const serviceWorkerCode = `
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      return cached || fetch(event.request);
+    })
+  );
+});
+`;
+
+// ======= PWA Registry (in main app) =======
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js');
+}
+
